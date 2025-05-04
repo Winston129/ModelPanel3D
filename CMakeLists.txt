@@ -29,6 +29,7 @@ link_directories(
 add_executable(ModelPanel
     ${SRC_DIR}/main.cpp
     ${SRC_DIR}/MainPage.cpp
+    ${SRC_DIR}/HelperFunc.cpp
     ${LIB_DIR}/imgui/imgui.cpp
     ${LIB_DIR}/imgui/imgui_draw.cpp
     ${LIB_DIR}/imgui/imgui_tables.cpp

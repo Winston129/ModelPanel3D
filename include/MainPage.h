@@ -1,9 +1,14 @@
-#ifndef MAIN_H
-#define MAIN_H
+#ifndef MAIN_PAGE_H
+#define MAIN_PAGE_H
 
-#include <GL/glew.h>    // Подключаем GLEW и OpenGL
+#include <iostream>
+#include <vector>
+#include <string>
+// #include <string>
+
+#include <GL/glew.h>
 #include <GLFW/glfw3.h>
-#include <GL/glu.h> // Для gluPerspective
+#include <GL/glu.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -11,13 +16,17 @@
 
 #include <Eigen/Dense> 
 #include "imgui.h"
-#include <iostream>
+#include "HelperFunc.h"
+
 
 class MainPage
 {
 private:
     GLuint shaderProgram;
     GLuint VAO, VBO;
+    // Panel
+    int vertex_count = 0;
+    // Mouse
     float position_x_mouse_pix=0.0f, position_y_mouse_pix=0.0f;
     float position_x_mouse_norm=0.0f, position_y_mouse_norm=0.0f;
     // Rotate Panel
@@ -25,6 +34,17 @@ private:
     float panel_rotation_velocity = 1.5f;
     float last_position_x_mouse=0.0f, last_position_y_mouse=0.0f;
     float pitch=0.0f, yaw=0.0f;
+    // file STL parse
+    struct Vertex {
+        float x, y, z;
+    };
+    struct Face {
+        Vertex normal;
+        Vertex v1, v2, v3;
+        uint16_t reserved;
+    };
+    // HelperFunc helper_func;
+
 
 public:
     MainPage();
@@ -37,9 +57,10 @@ public:
     void CreateShaders();
     void DrowPanel();
     void SetUpCube();
+    bool parseSTL(const std::string& filename, std::vector<Face>& faces);
 };
 
-#endif // MAIN_H
+#endif
 
 /*
 ! VBO - Loads data into GPU memory

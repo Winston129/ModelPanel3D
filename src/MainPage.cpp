@@ -23,7 +23,7 @@ GLFWwindow* MainPage::InitialisationGL()
     }
 
     // Create window
-    GLFWwindow* main_window = glfwCreateWindow(800, 700, "Model Panel", nullptr, nullptr);
+    GLFWwindow* main_window = glfwCreateWindow(1000, 900, "Model Panel", nullptr, nullptr);
     if(!main_window)
     {
         std::cerr << "Error create window (glfwCreateWindow)" << std::endl;
@@ -155,37 +155,90 @@ int MainPage::MouseRotatePanel(GLFWwindow* main_window)
 
 void MainPage::DrowPanel()
 {
+    glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 0.0f, 3.0f),
+                                glm::vec3(0.0f, 0.0f, 0.0f),
+                                glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f),
+                                            800.0f / 600.0f,
+                                            0.1f, 100.0f);
+
     glUseProgram(shaderProgram);
+    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+    glUniform3f(glGetUniformLocation(shaderProgram, "lightPos"), 0.0f, 0.0f, 3.0f);
+    glUniform3f(glGetUniformLocation(shaderProgram, "viewPos"), 0.0f, 0.0f, 3.0f);
+
     glBindVertexArray(this->VAO);
-    glDrawArrays(GL_TRIANGLES, 0, 36);
+    glDrawArrays(GL_TRIANGLES, 0, this->vertex_count);
 }
 
 
 void MainPage::CreateShaders()
 {
+    // const char* vertexShaderSource = R"glsl(
+    //     #version 330 core
+    //     layout (location = 0) in vec3 aPos;
+    //     layout (location = 1) in vec3 aColor;
+
+    //     uniform mat4 matrix_model;
+    //     out vec3 ourColor;
+
+    //     void main()
+    //     {
+    //         gl_Position = matrix_model * vec4(aPos, 1.0);
+    //         ourColor = aColor;
+    //     }
+    // )glsl";
+
+    // const char* fragmentShaderSource = R"glsl(
+    //     #version 330 
+    //     in vec3 ourColor;
+    //     out vec4 FragColor;
+
+    //     void main()
+    //     {
+    //         FragColor = vec4(ourColor, 1.0);
+    //     }
+    // )glsl";
+
     const char* vertexShaderSource = R"glsl(
         #version 330 core
         layout (location = 0) in vec3 aPos;
-        layout (location = 1) in vec3 aColor;
+        layout (location = 1) in vec3 aNormal;
 
         uniform mat4 matrix_model;
-        out vec3 ourColor;
+        uniform mat4 view;
+        uniform mat4 projection;
+
+        out vec3 FragPos;
+        out vec3 Normal;
 
         void main()
         {
-            gl_Position = matrix_model * vec4(aPos, 1.0);
-            ourColor = aColor;
+            FragPos = vec3(matrix_model * vec4(aPos, 1.0));
+            Normal = mat3(transpose(inverse(matrix_model))) * aNormal; 
+            gl_Position = projection * view * vec4(FragPos, 1.0);
         }
     )glsl";
 
     const char* fragmentShaderSource = R"glsl(
-        #version 330 
-        in vec3 ourColor;
+        #version 330 core
+        in vec3 FragPos;
+        in vec3 Normal;
+
+        uniform vec3 lightPos;
+        uniform vec3 viewPos;
+
         out vec4 FragColor;
 
         void main()
         {
-            FragColor = vec4(ourColor, 1.0);
+            vec3 norm = normalize(Normal);
+            vec3 lightDir = normalize(lightPos - FragPos);
+            float diff = max(dot(norm, lightDir), 0.0);
+
+            vec3 diffuse = diff * vec3(1.0, 1.0, 1.0);
+            FragColor = vec4(diffuse, 1.0);
         }
     )glsl";
 
@@ -209,94 +262,165 @@ void MainPage::CreateShaders()
 
 void MainPage::SetUpCube()
 {
-    float vertices[] = {
-        // ПЕРЕДНЯЯ грань (оранжевая)
-        -0.5f, -0.5f,  0.5f,   1.0f, 0.5f, 0.2f,
-        0.5f, -0.5f,  0.5f,   1.0f, 0.5f, 0.2f,
-        0.5f,  0.5f,  0.5f,   1.0f, 0.5f, 0.2f,
-        0.5f,  0.5f,  0.5f,   1.0f, 0.5f, 0.2f,
-        -0.5f,  0.5f,  0.5f,   1.0f, 0.5f, 0.2f,
-        -0.5f, -0.5f,  0.5f,   1.0f, 0.5f, 0.2f,
+    std::string path_model_stl = "G:/University2/3.2_course/cursach/ModelPanel_v2/model/model_panel_STL.stl";
+    std::vector<Face> faces;
+    if (!parseSTL(path_model_stl, faces))
+    {
+        std::cerr << "Model creation error" << std::endl;
+    }
 
-        // ЗАДНЯЯ грань (красная)
-        -0.5f, -0.5f, -0.5f,   1.0f, 0.0f, 0.0f,
-        0.5f, -0.5f, -0.5f,   1.0f, 0.0f, 0.0f,
-        0.5f,  0.5f, -0.5f,   1.0f, 0.0f, 0.0f,
-        0.5f,  0.5f, -0.5f,   1.0f, 0.0f, 0.0f,
-        -0.5f,  0.5f, -0.5f,   1.0f, 0.0f, 0.0f,
-        -0.5f, -0.5f, -0.5f,   1.0f, 0.0f, 0.0f,
+    std::vector<float> vertices;
+    for (const auto& face : faces) {
+        glm::vec3 n = {face.normal.x, face.normal.y, face.normal.z};
 
-        // ЛЕВАЯ грань (зелёная)
-        -0.5f,  0.5f,  0.5f,   0.0f, 1.0f, 0.0f,
-        -0.5f,  0.5f, -0.5f,   0.0f, 1.0f, 0.0f,
-        -0.5f, -0.5f, -0.5f,   0.0f, 1.0f, 0.0f,
-        -0.5f, -0.5f, -0.5f,   0.0f, 1.0f, 0.0f,
-        -0.5f, -0.5f,  0.5f,   0.0f, 1.0f, 0.0f,
-        -0.5f,  0.5f,  0.5f,   0.0f, 1.0f, 0.0f,
+        glm::vec3 v1 = {face.v1.x, face.v1.y, face.v1.z};
+        glm::vec3 v2 = {face.v2.x, face.v2.y, face.v2.z};
+        glm::vec3 v3 = {face.v3.x, face.v3.y, face.v3.z};
 
-        // ПРАВАЯ грань (синяя)
-        0.5f,  0.5f,  0.5f,   0.0f, 0.0f, 1.0f,
-        0.5f,  0.5f, -0.5f,   0.0f, 0.0f, 1.0f,
-        0.5f, -0.5f, -0.5f,   0.0f, 0.0f, 1.0f,
-        0.5f, -0.5f, -0.5f,   0.0f, 0.0f, 1.0f,
-        0.5f, -0.5f,  0.5f,   0.0f, 0.0f, 1.0f,
-        0.5f,  0.5f,  0.5f,   0.0f, 0.0f, 1.0f,
+        for (auto v : {v1, v2, v3}) {
+            // vertex: x, y, z, nx, ny, nz
+            vertices.insert(vertices.end(), {v.x, v.y, v.z, n.x, n.y, n.z});
+        }
+    }
 
-        // ВЕРХНЯЯ грань (жёлтая)
-        -0.5f,  0.5f, -0.5f,   1.0f, 1.0f, 0.0f,
-        0.5f,  0.5f, -0.5f,   1.0f, 1.0f, 0.0f,
-        0.5f,  0.5f,  0.5f,   1.0f, 1.0f, 0.0f,
-        0.5f,  0.5f,  0.5f,   1.0f, 1.0f, 0.0f,
-        -0.5f,  0.5f,  0.5f,   1.0f, 1.0f, 0.0f,
-        -0.5f,  0.5f, -0.5f,   1.0f, 1.0f, 0.0f,
+    this->vertex_count = static_cast<int>(vertices.size()) / 6;
 
-        // НИЖНЯЯ грань (розовая)
-        -0.5f, -0.5f, -0.5f,   1.0f, 0.0f, 1.0f,
-        0.5f, -0.5f, -0.5f,   1.0f, 0.0f, 1.0f,
-        0.5f, -0.5f,  0.5f,   1.0f, 0.0f, 1.0f,
-        0.5f, -0.5f,  0.5f,   1.0f, 0.0f, 1.0f,
-        -0.5f, -0.5f,  0.5f,   1.0f, 0.0f, 1.0f,
-        -0.5f, -0.5f, -0.5f,   1.0f, 0.0f, 1.0f
-    };
-    
-    glGenVertexArrays(1, &this->VAO);  // создаём 1 VAO (Vertex Array Object)
-    glGenBuffers(1, &this->VBO);       // создаём 1 VBO (Vertex Buffer Object)
-    
-    glBindVertexArray(this->VAO);  //включаем VAO
-    glBindBuffer(GL_ARRAY_BUFFER, this->VBO);  //включаем VBO
-    
-    //закидываем в VBO наши вершины
-    glBufferData(
-        GL_ARRAY_BUFFER,
-        sizeof(vertices),
-        vertices,
-        GL_STATIC_DRAW
-    );
-    
-    // Описываем формат вершин
-    glVertexAttribPointer(
-        0,                  // номер атрибута в шейдере (location = 0)
-        3,                  // сколько компонентов на вершину (x, y, z)
-        GL_FLOAT,           // тип данных
-        GL_FALSE,           // не нормализовать
-        6 * sizeof(float),  // размер одного набора данных (stride)
-        (void*)0            // смещение (с первого элемента)
-    );
-    glVertexAttribPointer(
-        1,
-        3,
-        GL_FLOAT,
-        GL_FALSE,
-        6 * sizeof(float),
-        (void*)(3 * sizeof(float))  // пропускаем первые 3 эелемента (x,y,z)
-    );
+    glGenVertexArrays(1, &this->VAO);
+    glGenBuffers(1, &this->VBO);
 
-    // Enable attributes
+    glBindVertexArray(this->VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, this->VBO);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+
+    // layout(location = 0): position
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
+
+    // layout(location = 1): normal
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
-    
-    
-    //Отвязали VBO и VAO, чтобы случайно не испортить
+
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 }
+
+bool MainPage::parseSTL(const std::string& path_model_stl, std::vector<Face>& faces)
+{
+    std::ifstream file(path_model_stl, std::ios::binary);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open STL file: " << path_model_stl << std::endl;
+        return false;
+    }
+
+    char header[80];
+    file.read(header, 80); // пропускаем заголовок
+
+    uint32_t numTriangles = 0;
+    file.read(reinterpret_cast<char*>(&numTriangles), sizeof(uint32_t));
+    faces.resize(numTriangles);
+
+    for (uint32_t i = 0; i < numTriangles; ++i) {
+        Face& face = faces[i];
+        file.read(reinterpret_cast<char*>(&face.normal), sizeof(Vertex));
+        file.read(reinterpret_cast<char*>(&face.v1), sizeof(Vertex));
+        file.read(reinterpret_cast<char*>(&face.v2), sizeof(Vertex));
+        file.read(reinterpret_cast<char*>(&face.v3), sizeof(Vertex));
+        file.read(reinterpret_cast<char*>(&face.reserved), sizeof(uint16_t));
+    }
+
+    return true;
+}
+
+// void MainPage::SetUpCube()
+// {
+//     float vertices[] = {
+//         // ПЕРЕДНЯЯ грань (оранжевая)
+//         -0.5f, -0.5f,  0.5f,   1.0f, 0.5f, 0.2f,
+//         0.5f, -0.5f,  0.5f,   1.0f, 0.5f, 0.2f,
+//         0.5f,  0.5f,  0.5f,   1.0f, 0.5f, 0.2f,
+//         0.5f,  0.5f,  0.5f,   1.0f, 0.5f, 0.2f,
+//         -0.5f,  0.5f,  0.5f,   1.0f, 0.5f, 0.2f,
+//         -0.5f, -0.5f,  0.5f,   1.0f, 0.5f, 0.2f,
+
+//         // ЗАДНЯЯ грань (красная)
+//         -0.5f, -0.5f, -0.5f,   1.0f, 0.0f, 0.0f,
+//         0.5f, -0.5f, -0.5f,   1.0f, 0.0f, 0.0f,
+//         0.5f,  0.5f, -0.5f,   1.0f, 0.0f, 0.0f,
+//         0.5f,  0.5f, -0.5f,   1.0f, 0.0f, 0.0f,
+//         -0.5f,  0.5f, -0.5f,   1.0f, 0.0f, 0.0f,
+//         -0.5f, -0.5f, -0.5f,   1.0f, 0.0f, 0.0f,
+
+//         // ЛЕВАЯ грань (зелёная)
+//         -0.5f,  0.5f,  0.5f,   0.0f, 1.0f, 0.0f,
+//         -0.5f,  0.5f, -0.5f,   0.0f, 1.0f, 0.0f,
+//         -0.5f, -0.5f, -0.5f,   0.0f, 1.0f, 0.0f,
+//         -0.5f, -0.5f, -0.5f,   0.0f, 1.0f, 0.0f,
+//         -0.5f, -0.5f,  0.5f,   0.0f, 1.0f, 0.0f,
+//         -0.5f,  0.5f,  0.5f,   0.0f, 1.0f, 0.0f,
+
+//         // ПРАВАЯ грань (синяя)
+//         0.5f,  0.5f,  0.5f,   0.0f, 0.0f, 1.0f,
+//         0.5f,  0.5f, -0.5f,   0.0f, 0.0f, 1.0f,
+//         0.5f, -0.5f, -0.5f,   0.0f, 0.0f, 1.0f,
+//         0.5f, -0.5f, -0.5f,   0.0f, 0.0f, 1.0f,
+//         0.5f, -0.5f,  0.5f,   0.0f, 0.0f, 1.0f,
+//         0.5f,  0.5f,  0.5f,   0.0f, 0.0f, 1.0f,
+
+//         // ВЕРХНЯЯ грань (жёлтая)
+//         -0.5f,  0.5f, -0.5f,   1.0f, 1.0f, 0.0f,
+//         0.5f,  0.5f, -0.5f,   1.0f, 1.0f, 0.0f,
+//         0.5f,  0.5f,  0.5f,   1.0f, 1.0f, 0.0f,
+//         0.5f,  0.5f,  0.5f,   1.0f, 1.0f, 0.0f,
+//         -0.5f,  0.5f,  0.5f,   1.0f, 1.0f, 0.0f,
+//         -0.5f,  0.5f, -0.5f,   1.0f, 1.0f, 0.0f,
+
+//         // НИЖНЯЯ грань (розовая)
+//         -0.5f, -0.5f, -0.5f,   1.0f, 0.0f, 1.0f,
+//         0.5f, -0.5f, -0.5f,   1.0f, 0.0f, 1.0f,
+//         0.5f, -0.5f,  0.5f,   1.0f, 0.0f, 1.0f,
+//         0.5f, -0.5f,  0.5f,   1.0f, 0.0f, 1.0f,
+//         -0.5f, -0.5f,  0.5f,   1.0f, 0.0f, 1.0f,
+//         -0.5f, -0.5f, -0.5f,   1.0f, 0.0f, 1.0f
+//     };
+    
+//     glGenVertexArrays(1, &this->VAO);  // создаём 1 VAO (Vertex Array Object)
+//     glGenBuffers(1, &this->VBO);       // создаём 1 VBO (Vertex Buffer Object)
+    
+//     glBindVertexArray(this->VAO);  //включаем VAO
+//     glBindBuffer(GL_ARRAY_BUFFER, this->VBO);  //включаем VBO
+    
+//     //закидываем в VBO наши вершины
+//     glBufferData(
+//         GL_ARRAY_BUFFER,
+//         sizeof(vertices),
+//         vertices,
+//         GL_STATIC_DRAW
+//     );
+    
+//     // Описываем формат вершин
+//     glVertexAttribPointer(
+//         0,                  // номер атрибута в шейдере (location = 0)
+//         3,                  // сколько компонентов на вершину (x, y, z)
+//         GL_FLOAT,           // тип данных
+//         GL_FALSE,           // не нормализовать
+//         6 * sizeof(float),  // размер одного набора данных (stride)
+//         (void*)0            // смещение (с первого элемента)
+//     );
+//     glVertexAttribPointer(
+//         1,
+//         3,
+//         GL_FLOAT,
+//         GL_FALSE,
+//         6 * sizeof(float),
+//         (void*)(3 * sizeof(float))  // пропускаем первые 3 эелемента (x,y,z)
+//     );
+
+//     // Enable attributes
+//     glEnableVertexAttribArray(0);
+//     glEnableVertexAttribArray(1);
+    
+    
+//     //Отвязали VBO и VAO, чтобы случайно не испортить
+//     glBindBuffer(GL_ARRAY_BUFFER, 0);
+//     glBindVertexArray(0);
+// }
