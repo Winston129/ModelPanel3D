@@ -1,14 +1,15 @@
 #include "MainPage.h"
 
-/*
-! FreeFunction
-*/
-void FreeFunction_MouseCallback(GLFWwindow* main_window, double position_x, double position_y);
+/*┌────────────────────┐*/
+/*├───┤FreeFunction├───┤*/
+/*└────────────────────┘*/
+void Free_MousePosCallback(GLFWwindow* main_window, double position_x, double position_y);
+void Free_MouseScrollCallback(GLFWwindow* main_window, double xoffset, double yoffset);
 
 
-MainPage::MainPage()
+MainPage::MainPage(const std::string& path_ref) : m_path_model_stl(path_ref)
 {
-    MainPage::WindowModelPanel();
+    WindowModelPanel();
 }
 MainPage::~MainPage(){}
 
@@ -23,7 +24,7 @@ GLFWwindow* MainPage::InitialisationGL()
     }
 
     // Create window
-    GLFWwindow* main_window = glfwCreateWindow(1000, 900, "Model Panel", nullptr, nullptr);
+    GLFWwindow* main_window = glfwCreateWindow(WIDTH_WINDOW, HEIGHT_WINDOW, "Model Panel", nullptr, nullptr);
     if(!main_window)
     {
         std::cerr << "Error create window (glfwCreateWindow)" << std::endl;
@@ -47,8 +48,10 @@ GLFWwindow* MainPage::InitialisationGL()
     }
 
 
+    // Scroll mouse
+    glfwSetScrollCallback(main_window, Free_MouseScrollCallback);
     // Initialisation mouse
-    glfwSetCursorPosCallback(main_window, FreeFunction_MouseCallback);
+    glfwSetCursorPosCallback(main_window, Free_MousePosCallback);
 
 
     return main_window;
@@ -65,7 +68,7 @@ int MainPage::WindowModelPanel()
 
     glEnable(GL_DEPTH_TEST);
     CreateShaders(); // MainPage::CreateShaders();
-    SetUpCube();    // MainPage::SetUpCube();
+    SetUpPanel();    // MainPage::SetUpPanel();
     //run
     while(!glfwWindowShouldClose(main_window))
     {
@@ -74,7 +77,7 @@ int MainPage::WindowModelPanel()
         glClearColor(0.0f, 0.22666f, 0.22666, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        DrowPanel();
+        DrowPanel(main_window);
 
         glMatrixMode(GL_MODELVIEW);
         glfwSwapBuffers(main_window);
@@ -85,146 +88,140 @@ int MainPage::WindowModelPanel()
     return 0;
 }
 
-void FreeFunction_MouseCallback(GLFWwindow* main_window, double position_x, double position_y)
+
+/*┌────────────────────┐*/
+/*├───┤Mouse Scroll├───┤*/
+/*└────────────────────┘*/
+void Free_MouseScrollCallback(GLFWwindow* main_window, double xoffset, double yoffset)
 {
     MainPage* this_main_page = static_cast<MainPage*>(glfwGetWindowUserPointer(main_window));
     if(this_main_page)
     {
-        this_main_page->MouseCallback(main_window, position_x, position_y);
+        this_main_page->MouseScrollCallback(main_window, xoffset, yoffset);
     }
 }
 
 
-void MainPage::MouseCallback(GLFWwindow* main_window, double position_x, double position_y)
+void MainPage::MouseScrollCallback(GLFWwindow* main_window, double xoffset, double yoffset)
+{
+    std::cout << "(x, y) = " << xoffset << ", " << yoffset << std::endl;
+
+    if(yoffset == 1)
+    {
+        m_default_view_z += m_velocity_view_z;
+    }
+    else if(yoffset == -1)
+    {
+        m_default_view_z -= m_velocity_view_z;
+    }
+    yoffset=0;
+}
+
+
+/*┌──────────────────────┐*/
+/*├───┤Mouse Position├───┤*/
+/*└──────────────────────┘*/
+void Free_MousePosCallback(GLFWwindow* main_window, double position_x, double position_y)
+{
+    MainPage* this_main_page = static_cast<MainPage*>(glfwGetWindowUserPointer(main_window));
+    if(this_main_page)
+    {
+        this_main_page->MousePosCallback(main_window, position_x, position_y);
+    }
+}
+
+
+void MainPage::MousePosCallback(GLFWwindow* main_window, double position_x, double position_y)
 {
     // Load position cursor mouse (pix) | position_x_mouse, position_y_mouse
     this->position_x_mouse_pix = static_cast<float>(position_x);
     this->position_y_mouse_pix = static_cast<float>(position_y);
-    std::cout << "Position (mouse) >> x:" << this->position_x_mouse_pix << ", y:" << this->position_y_mouse_pix << std::endl;
     // Get size window | width, height
     int width, height;
     glfwGetWindowSize(main_window, &width, &height);
-    std::cout <<  "width: " <<  width << " height: " << height << std::endl;
     // Convert from "pix" to "norm"
     this->position_x_mouse_norm = (position_x / width) * 2.0f - 1.0f;
     this->position_y_mouse_norm = 1.0f - (position_y / height) * 2.0f;
-
-
-    MouseRotatePanel(main_window);
-
 }
 
 
-int MainPage::MouseRotatePanel(GLFWwindow* main_window)
-{
-    glm::mat4& matrix = this->matrix_panel_rotate;
-    float& last_x = this->last_position_x_mouse;
-    float& last_y = this->last_position_y_mouse;
-    float& pos_x = this->position_x_mouse_norm;
-    float& pos_y = this->position_y_mouse_norm;
-
-    
-    float x_offset, y_offset;
-
-    if(glfwGetMouseButton(main_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
-    {
-        x_offset = last_x - pos_x;
-        y_offset = pos_y - last_y;
-
-        last_x = pos_x;
-        last_y = pos_y;
-
-        this->pitch += x_offset * panel_rotation_velocity;
-        this->yaw += y_offset * panel_rotation_velocity;
-
-        matrix = glm::rotate(matrix, glm::radians(this->yaw), glm::vec3(1.0f, 0.0f, 0.0f)); //X
-        matrix = glm::rotate(matrix, glm::radians(this->pitch), glm::vec3(0.0f, 1.0f, 0.0f)); //Y
-        
-        unsigned int model_loc = glGetUniformLocation(shaderProgram, "matrix_model");
-        glUniformMatrix4fv(
-            model_loc,
-            1,
-            GL_FALSE,
-            glm::value_ptr(matrix)
-        );
-    }
-
-    return 0;
-}
-
-
-void MainPage::DrowPanel()
-{
-    glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 0.0f, 3.0f),
-                                glm::vec3(0.0f, 0.0f, 0.0f),
-                                glm::vec3(0.0f, 1.0f, 0.0f));
-    glm::mat4 projection = glm::perspective(glm::radians(45.0f),
-                                            800.0f / 600.0f,
-                                            0.1f, 100.0f);
-
+/*┌──────────────────┐*/
+/*├───┤Drow Panel├───┤*/
+/*└──────────────────┘*/
+void MainPage::DrowPanel(GLFWwindow* main_window)
+{ 
     glUseProgram(shaderProgram);
-    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
-    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
-    glUniform3f(glGetUniformLocation(shaderProgram, "lightPos"), 0.0f, 0.0f, 3.0f);
-    glUniform3f(glGetUniformLocation(shaderProgram, "viewPos"), 0.0f, 0.0f, 3.0f);
-
+    UpdateUniform(main_window);
     glBindVertexArray(this->VAO);
-    glDrawArrays(GL_TRIANGLES, 0, this->vertex_count);
+    glDrawArrays(GL_TRIANGLES, 0, m_vertex_count);
+}
+
+
+void MainPage::UpdateUniform(GLFWwindow* main_window)
+{
+    /*====== MATRIX VIEW ======*/
+
+    /* mouse wheel scrolling */
+    glm::mat4& view = m_camera_scale;
+    const glm::mat4 unit_matrix = glm::mat4(1.0);
+
+    view = glm::translate(unit_matrix, glm::vec3(0.0f, 0.0f, m_default_view_z));
+
+    unsigned int view_loc = glGetUniformLocation(this->shaderProgram, "uView");
+    glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
+
+    /* light */
+    glm::vec3 light_pos = glm::vec3(0.0f, 0.0f, 10.0f);
+
+    unsigned int light_pos_loc = glGetUniformLocation(this->shaderProgram, "lightPos");
+    glUniform3fv(light_pos_loc, 1, glm::value_ptr(light_pos));
+
+    /*====== MATRIX MODEL ======*/
+    
+    glm::mat4 model = glm::mat4(1.0f);
+    model = glm::rotate(model, glm::radians(55.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
+    unsigned int model_loc = glGetUniformLocation(this->shaderProgram, "uModel");
+    glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
+    
+    /*====== MATRIX PROJECTION ======*/
+
+    glm::mat4 projection = glm::mat4(1.0f);
+    projection = glm::perspective(glm::radians(45.0f), WIDTH_WINDOW / HEIGHT_WINDOW, 0.1f, 100.0f);
+    
+    unsigned int projection_loc = glGetUniformLocation(this->shaderProgram, "uProjection");
+    glUniformMatrix4fv(projection_loc, 1, GL_FALSE, glm::value_ptr(projection));
 }
 
 
 void MainPage::CreateShaders()
 {
-    // const char* vertexShaderSource = R"glsl(
-    //     #version 330 core
-    //     layout (location = 0) in vec3 aPos;
-    //     layout (location = 1) in vec3 aColor;
-
-    //     uniform mat4 matrix_model;
-    //     out vec3 ourColor;
-
-    //     void main()
-    //     {
-    //         gl_Position = matrix_model * vec4(aPos, 1.0);
-    //         ourColor = aColor;
-    //     }
-    // )glsl";
-
-    // const char* fragmentShaderSource = R"glsl(
-    //     #version 330 
-    //     in vec3 ourColor;
-    //     out vec4 FragColor;
-
-    //     void main()
-    //     {
-    //         FragColor = vec4(ourColor, 1.0);
-    //     }
-    // )glsl";
-
     const char* vertexShaderSource = R"glsl(
         #version 330 core
-        layout (location = 0) in vec3 aPos;
-        layout (location = 1) in vec3 aNormal;
+        layout (location=0) in vec3 layoutPosition;
+        layout (location=1) in vec3 layoutNormal;
 
-        uniform mat4 matrix_model;
-        uniform mat4 view;
-        uniform mat4 projection;
+        uniform mat4 uModel;
+        uniform mat4 uView;
+        uniform mat4 uProjection;
 
-        out vec3 FragPos;
-        out vec3 Normal;
+        out vec3 outModelPos;
+        out vec3 outNormal;
 
         void main()
         {
-            FragPos = vec3(matrix_model * vec4(aPos, 1.0));
-            Normal = mat3(transpose(inverse(matrix_model))) * aNormal; 
-            gl_Position = projection * view * vec4(FragPos, 1.0);
+            outNormal = mat3(transpose(inverse(uModel))) * layoutNormal; 
+
+            outModelPos = vec3(uModel * vec4(layoutPosition, 1.0));
+            gl_Position = uProjection * uView * vec4(outModelPos, 1.0);
         }
     )glsl";
 
+
     const char* fragmentShaderSource = R"glsl(
         #version 330 core
-        in vec3 FragPos;
-        in vec3 Normal;
+        in vec3 outModelPos;
+        in vec3 outNormal;
 
         uniform vec3 lightPos;
         uniform vec3 viewPos;
@@ -233,8 +230,8 @@ void MainPage::CreateShaders()
 
         void main()
         {
-            vec3 norm = normalize(Normal);
-            vec3 lightDir = normalize(lightPos - FragPos);
+            vec3 norm = normalize(outNormal);
+            vec3 lightDir = normalize(lightPos - outModelPos);
             float diff = max(dot(norm, lightDir), 0.0);
 
             vec3 diffuse = diff * vec3(1.0, 1.0, 1.0);
@@ -260,11 +257,10 @@ void MainPage::CreateShaders()
 }
 
 
-void MainPage::SetUpCube()
+void MainPage::SetUpPanel()
 {
-    std::string path_model_stl = "G:/University2/3.2_course/cursach/ModelPanel_v2/model/model_panel_STL.stl";
     std::vector<Face> faces;
-    if (!parseSTL(path_model_stl, faces))
+    if (!parseSTL(faces))
     {
         std::cerr << "Model creation error" << std::endl;
     }
@@ -283,7 +279,7 @@ void MainPage::SetUpCube()
         }
     }
 
-    this->vertex_count = static_cast<int>(vertices.size()) / 6;
+    m_vertex_count = static_cast<int>(vertices.size()) / 6;
 
     glGenVertexArrays(1, &this->VAO);
     glGenBuffers(1, &this->VBO);
@@ -292,11 +288,11 @@ void MainPage::SetUpCube()
     glBindBuffer(GL_ARRAY_BUFFER, this->VBO);
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
 
-    // layout(location = 0): position
+    // location=0 => "position"
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
-    // layout(location = 1): normal
+    // location=1 => "normal"
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
@@ -304,16 +300,16 @@ void MainPage::SetUpCube()
     glBindVertexArray(0);
 }
 
-bool MainPage::parseSTL(const std::string& path_model_stl, std::vector<Face>& faces)
+bool MainPage::parseSTL(std::vector<Face>& faces)
 {
-    std::ifstream file(path_model_stl, std::ios::binary);
+    std::ifstream file(m_path_model_stl, std::ios::binary);
     if (!file.is_open()) {
-        std::cerr << "Failed to open STL file: " << path_model_stl << std::endl;
+        std::cerr << "Failed to open STL file: " << m_path_model_stl << std::endl;
         return false;
     }
 
     char header[80];
-    file.read(header, 80); // пропускаем заголовок
+    file.read(header, 80);
 
     uint32_t numTriangles = 0;
     file.read(reinterpret_cast<char*>(&numTriangles), sizeof(uint32_t));
@@ -330,97 +326,3 @@ bool MainPage::parseSTL(const std::string& path_model_stl, std::vector<Face>& fa
 
     return true;
 }
-
-// void MainPage::SetUpCube()
-// {
-//     float vertices[] = {
-//         // ПЕРЕДНЯЯ грань (оранжевая)
-//         -0.5f, -0.5f,  0.5f,   1.0f, 0.5f, 0.2f,
-//         0.5f, -0.5f,  0.5f,   1.0f, 0.5f, 0.2f,
-//         0.5f,  0.5f,  0.5f,   1.0f, 0.5f, 0.2f,
-//         0.5f,  0.5f,  0.5f,   1.0f, 0.5f, 0.2f,
-//         -0.5f,  0.5f,  0.5f,   1.0f, 0.5f, 0.2f,
-//         -0.5f, -0.5f,  0.5f,   1.0f, 0.5f, 0.2f,
-
-//         // ЗАДНЯЯ грань (красная)
-//         -0.5f, -0.5f, -0.5f,   1.0f, 0.0f, 0.0f,
-//         0.5f, -0.5f, -0.5f,   1.0f, 0.0f, 0.0f,
-//         0.5f,  0.5f, -0.5f,   1.0f, 0.0f, 0.0f,
-//         0.5f,  0.5f, -0.5f,   1.0f, 0.0f, 0.0f,
-//         -0.5f,  0.5f, -0.5f,   1.0f, 0.0f, 0.0f,
-//         -0.5f, -0.5f, -0.5f,   1.0f, 0.0f, 0.0f,
-
-//         // ЛЕВАЯ грань (зелёная)
-//         -0.5f,  0.5f,  0.5f,   0.0f, 1.0f, 0.0f,
-//         -0.5f,  0.5f, -0.5f,   0.0f, 1.0f, 0.0f,
-//         -0.5f, -0.5f, -0.5f,   0.0f, 1.0f, 0.0f,
-//         -0.5f, -0.5f, -0.5f,   0.0f, 1.0f, 0.0f,
-//         -0.5f, -0.5f,  0.5f,   0.0f, 1.0f, 0.0f,
-//         -0.5f,  0.5f,  0.5f,   0.0f, 1.0f, 0.0f,
-
-//         // ПРАВАЯ грань (синяя)
-//         0.5f,  0.5f,  0.5f,   0.0f, 0.0f, 1.0f,
-//         0.5f,  0.5f, -0.5f,   0.0f, 0.0f, 1.0f,
-//         0.5f, -0.5f, -0.5f,   0.0f, 0.0f, 1.0f,
-//         0.5f, -0.5f, -0.5f,   0.0f, 0.0f, 1.0f,
-//         0.5f, -0.5f,  0.5f,   0.0f, 0.0f, 1.0f,
-//         0.5f,  0.5f,  0.5f,   0.0f, 0.0f, 1.0f,
-
-//         // ВЕРХНЯЯ грань (жёлтая)
-//         -0.5f,  0.5f, -0.5f,   1.0f, 1.0f, 0.0f,
-//         0.5f,  0.5f, -0.5f,   1.0f, 1.0f, 0.0f,
-//         0.5f,  0.5f,  0.5f,   1.0f, 1.0f, 0.0f,
-//         0.5f,  0.5f,  0.5f,   1.0f, 1.0f, 0.0f,
-//         -0.5f,  0.5f,  0.5f,   1.0f, 1.0f, 0.0f,
-//         -0.5f,  0.5f, -0.5f,   1.0f, 1.0f, 0.0f,
-
-//         // НИЖНЯЯ грань (розовая)
-//         -0.5f, -0.5f, -0.5f,   1.0f, 0.0f, 1.0f,
-//         0.5f, -0.5f, -0.5f,   1.0f, 0.0f, 1.0f,
-//         0.5f, -0.5f,  0.5f,   1.0f, 0.0f, 1.0f,
-//         0.5f, -0.5f,  0.5f,   1.0f, 0.0f, 1.0f,
-//         -0.5f, -0.5f,  0.5f,   1.0f, 0.0f, 1.0f,
-//         -0.5f, -0.5f, -0.5f,   1.0f, 0.0f, 1.0f
-//     };
-    
-//     glGenVertexArrays(1, &this->VAO);  // создаём 1 VAO (Vertex Array Object)
-//     glGenBuffers(1, &this->VBO);       // создаём 1 VBO (Vertex Buffer Object)
-    
-//     glBindVertexArray(this->VAO);  //включаем VAO
-//     glBindBuffer(GL_ARRAY_BUFFER, this->VBO);  //включаем VBO
-    
-//     //закидываем в VBO наши вершины
-//     glBufferData(
-//         GL_ARRAY_BUFFER,
-//         sizeof(vertices),
-//         vertices,
-//         GL_STATIC_DRAW
-//     );
-    
-//     // Описываем формат вершин
-//     glVertexAttribPointer(
-//         0,                  // номер атрибута в шейдере (location = 0)
-//         3,                  // сколько компонентов на вершину (x, y, z)
-//         GL_FLOAT,           // тип данных
-//         GL_FALSE,           // не нормализовать
-//         6 * sizeof(float),  // размер одного набора данных (stride)
-//         (void*)0            // смещение (с первого элемента)
-//     );
-//     glVertexAttribPointer(
-//         1,
-//         3,
-//         GL_FLOAT,
-//         GL_FALSE,
-//         6 * sizeof(float),
-//         (void*)(3 * sizeof(float))  // пропускаем первые 3 эелемента (x,y,z)
-//     );
-
-//     // Enable attributes
-//     glEnableVertexAttribArray(0);
-//     glEnableVertexAttribArray(1);
-    
-    
-//     //Отвязали VBO и VAO, чтобы случайно не испортить
-//     glBindBuffer(GL_ARRAY_BUFFER, 0);
-//     glBindVertexArray(0);
-// }

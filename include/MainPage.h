@@ -22,18 +22,39 @@
 class MainPage
 {
 private:
+    // path STL
+    const std::string& m_path_model_stl;
+    // Window size
+    const float WIDTH_WINDOW = 1920.0f;
+    const float HEIGHT_WINDOW = 1080.0f;
+    // SHADERS
     GLuint shaderProgram;
     GLuint VAO, VBO;
-    // Panel
-    int vertex_count = 0;
-    // Mouse
+    // helper var Panel
+    int m_vertex_count = 0;
+
+    /*=== VIEW ===*/
+    // Rote Camera
+    glm::mat4 m_camera_scale = glm::mat4(1.0f);
+    float m_default_view_z = -3.0f;
+    float m_velocity_view_z = 1.0f;
+
+    //! я хуй знает что это
+    // Position Camera
     float position_x_mouse_pix=0.0f, position_y_mouse_pix=0.0f;
     float position_x_mouse_norm=0.0f, position_y_mouse_norm=0.0f;
+
+    /*=== MODEL ===*/
+    // Panel matrix parameters
+    glm::mat4 matrix_panel_model = glm::mat4(1.0f);
+    glm::mat4 matrix_panel_view = glm::mat4(1.0f);
+    glm::mat4 matrix_panel_projection = glm::mat4(1.0f);
+
     // Rotate Panel
-    glm::mat4 matrix_panel_rotate = glm::mat4(1.0f);
-    float panel_rotation_velocity = 1.5f;
+    float panel_rotation_velocity = 1.5f; //!del
     float last_position_x_mouse=0.0f, last_position_y_mouse=0.0f;
-    float pitch=0.0f, yaw=0.0f;
+    float pitch=0.0f, yaw=-90.0f;
+
     // file STL parse
     struct Vertex {
         float x, y, z;
@@ -43,26 +64,38 @@ private:
         Vertex v1, v2, v3;
         uint16_t reserved;
     };
-    // HelperFunc helper_func;
 
 
 public:
-    MainPage();
+    MainPage(const std::string& path);
     ~MainPage();
 
+    // Main functions
     GLFWwindow* InitialisationGL();
     int WindowModelPanel();
-    void MouseCallback(GLFWwindow* main_window, double position_x, double position_y);
-    int MouseRotatePanel(GLFWwindow* main_window);
+    
+    // Drow model
+    void DrowPanel(GLFWwindow* main_window);
+    void UpdateUniform(GLFWwindow* main_window);
     void CreateShaders();
-    void DrowPanel();
-    void SetUpCube();
-    bool parseSTL(const std::string& filename, std::vector<Face>& faces);
+
+    // Mouse Scroll
+    void MouseScrollCallback(GLFWwindow* main_window, double xoffset, double yoffset);
+
+    // Mouse Position
+    void MousePosCallback(GLFWwindow* main_window, double position_x, double position_y);
+
+    void SetUpPanel();
+    // Parsing 
+    bool parseSTL(std::vector<Face>& faces);
 };
 
 #endif
 
-/*
-! VBO - Loads data into GPU memory
-! VAO - Specifies which part of the VBO to load
-*/
+/*┌─────────────────────────────────────────────────┐*/
+/*│         VBO - Loads data into GPU memory        │*/
+/*├─────────────────────────────────────────────────┤*/
+/*│  VAO - Specifies which part of the VBO to load  │*/
+/*├─────────────────────────────────────────────────┤*/
+/*│              "m_", this "member"                │*/
+/*└─────────────────────────────────────────────────┘*/
