@@ -14,9 +14,11 @@ int main()
 
     std::vector<std::string> list_file_path=
     {
+        "E:/University2/3.2_course/cursach/ModelPanel/model/model_panel_STL.stl",
+        "F:/University2/3.2_course/cursach/ModelPanel/model/model_panel_STL.stl",
+        "G:/University2/3.2_course/cursach/ModelPanel/model/model_panel_STL.stl",
         "D:/model_panel/model_panel_STL.stl",
-        "C:/model_panel/model_panel_STL.stl",
-        "G:/University2/3.2_course/cursach/ModelPanel/model/model_panel_STL.stl"
+        "C:/model_panel/model_panel_STL.stl"
     };
 
     for(std::string file_path : list_file_path)

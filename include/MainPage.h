@@ -34,26 +34,13 @@ private:
     int m_vertex_count = 0;
 
     /*=== VIEW ===*/
-    // Rote Camera
-    glm::mat4 m_camera_scale = glm::mat4(1.0f);
-    float m_default_view_z = -3.0f;
-    float m_velocity_view_z = 1.0f;
-
-    //! я хуй знает что это
-    // Position Camera
-    float position_x_mouse_pix=0.0f, position_y_mouse_pix=0.0f;
-    float position_x_mouse_norm=0.0f, position_y_mouse_norm=0.0f;
-
-    /*=== MODEL ===*/
-    // Panel matrix parameters
-    glm::mat4 matrix_panel_model = glm::mat4(1.0f);
-    glm::mat4 matrix_panel_view = glm::mat4(1.0f);
-    glm::mat4 matrix_panel_projection = glm::mat4(1.0f);
-
-    // Rotate Panel
-    float panel_rotation_velocity = 1.5f; //!del
-    float last_position_x_mouse=0.0f, last_position_y_mouse=0.0f;
-    float pitch=0.0f, yaw=-90.0f;
+    glm::mat4 m_camera_position = glm::mat4(1.0f);
+    glm::vec3 m_vec_camera_position = glm::vec3(1.0f);
+    float m_radius_to_centre = 3.0f;    //radius from camera to centre  
+    float m_velocity_to_centre = 1.0f;  //camera approach speed to the centre
+    // Angles
+    float m_pitch_camera=0.0f, m_yaw_camera=90.0f;
+    float m_last_x_mouse=0.0f, m_last_y_mouse=0.0f;
 
     // file STL parse
     struct Vertex {
@@ -79,11 +66,13 @@ public:
     void UpdateUniform(GLFWwindow* main_window);
     void CreateShaders();
 
-    // Mouse Scroll
-    void MouseScrollCallback(GLFWwindow* main_window, double xoffset, double yoffset);
+    // Mouse Wheel Scroll
+    void MouseScrollCallback(double xoffset, double yoffset);
 
-    // Mouse Position
+    // Mouse Cursor Position
     void MousePosCallback(GLFWwindow* main_window, double position_x, double position_y);
+    void CalculateRotationAngles(GLFWwindow* main_window, double position_x, double position_y);
+
 
     void SetUpPanel();
     // Parsing 

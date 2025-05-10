@@ -97,22 +97,23 @@ void Free_MouseScrollCallback(GLFWwindow* main_window, double xoffset, double yo
     MainPage* this_main_page = static_cast<MainPage*>(glfwGetWindowUserPointer(main_window));
     if(this_main_page)
     {
-        this_main_page->MouseScrollCallback(main_window, xoffset, yoffset);
+        this_main_page->MouseScrollCallback(xoffset, yoffset);
     }
 }
 
 
-void MainPage::MouseScrollCallback(GLFWwindow* main_window, double xoffset, double yoffset)
+void MainPage::MouseScrollCallback(double xoffset, double yoffset)
 {
-    std::cout << "(x, y) = " << xoffset << ", " << yoffset << std::endl;
+    // mouse wheel scrolling
+    // std::cout << "(x, y) = " << xoffset << ", " << yoffset << std::endl;
 
     if(yoffset == 1)
     {
-        m_default_view_z += m_velocity_view_z;
+        m_radius_to_centre -= m_velocity_to_centre;
     }
     else if(yoffset == -1)
     {
-        m_default_view_z -= m_velocity_view_z;
+        m_radius_to_centre += m_velocity_to_centre;
     }
     yoffset=0;
 }
@@ -133,15 +134,37 @@ void Free_MousePosCallback(GLFWwindow* main_window, double position_x, double po
 
 void MainPage::MousePosCallback(GLFWwindow* main_window, double position_x, double position_y)
 {
-    // Load position cursor mouse (pix) | position_x_mouse, position_y_mouse
-    this->position_x_mouse_pix = static_cast<float>(position_x);
-    this->position_y_mouse_pix = static_cast<float>(position_y);
-    // Get size window | width, height
-    int width, height;
-    glfwGetWindowSize(main_window, &width, &height);
-    // Convert from "pix" to "norm"
-    this->position_x_mouse_norm = (position_x / width) * 2.0f - 1.0f;
-    this->position_y_mouse_norm = 1.0f - (position_y / height) * 2.0f;
+    CalculateRotationAngles(main_window, position_x, position_y);
+}
+
+
+void MainPage::CalculateRotationAngles(GLFWwindow* main_window, double position_x, double position_y)
+{
+    // Angles for camera
+    float sensitivity = 0.1f;
+
+    float deltaX = static_cast<float>(position_x - m_last_x_mouse);
+    float deltaY = static_cast<float>(position_y - m_last_y_mouse);
+
+    m_last_x_mouse = static_cast<float>(position_x);
+    m_last_y_mouse = static_cast<float>(position_y);
+
+    if(glfwGetMouseButton(main_window, GLFW_MOUSE_BUTTON_LEFT)==GLFW_PRESS)
+    {
+        m_yaw_camera += deltaX * sensitivity;
+        m_pitch_camera += deltaY * sensitivity;
+    }
+
+    // std::cout << "(m_yaw_camera, m_pitch_camera) = " << m_yaw_camera << ","<< m_pitch_camera <<std::endl;
+    
+    if (m_pitch_camera > 89.0f)
+    {
+        m_pitch_camera = 89.0f;
+    }
+    if (m_pitch_camera < -89.0f)
+    {
+        m_pitch_camera = -89.0f;
+    }
 }
 
 
@@ -151,7 +174,9 @@ void MainPage::MousePosCallback(GLFWwindow* main_window, double position_x, doub
 void MainPage::DrowPanel(GLFWwindow* main_window)
 { 
     glUseProgram(shaderProgram);
+
     UpdateUniform(main_window);
+
     glBindVertexArray(this->VAO);
     glDrawArrays(GL_TRIANGLES, 0, m_vertex_count);
 }
@@ -161,29 +186,34 @@ void MainPage::UpdateUniform(GLFWwindow* main_window)
 {
     /*====== MATRIX VIEW ======*/
 
-    /* mouse wheel scrolling */
-    glm::mat4& view = m_camera_scale;
-    const glm::mat4 unit_matrix = glm::mat4(1.0);
+    // view position
+    glm::mat4& view = m_camera_position;
+    glm::vec3& vec_view = m_vec_camera_position;
 
-    view = glm::translate(unit_matrix, glm::vec3(0.0f, 0.0f, m_default_view_z));
+    vec_view.x = m_radius_to_centre * cos(glm::radians(m_yaw_camera)) * cos(glm::radians(m_pitch_camera));
+    vec_view.y = m_radius_to_centre * sin(glm::radians(m_pitch_camera));
+    vec_view.z = m_radius_to_centre * sin(glm::radians(m_yaw_camera)) * cos(glm::radians(m_pitch_camera));
+
+    view = glm::lookAt(vec_view, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
     unsigned int view_loc = glGetUniformLocation(this->shaderProgram, "uView");
     glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
 
-    /* light */
-    glm::vec3 light_pos = glm::vec3(0.0f, 0.0f, 10.0f);
-
-    unsigned int light_pos_loc = glGetUniformLocation(this->shaderProgram, "lightPos");
-    glUniform3fv(light_pos_loc, 1, glm::value_ptr(light_pos));
-
     /*====== MATRIX MODEL ======*/
     
+    // model position
     glm::mat4 model = glm::mat4(1.0f);
     model = glm::rotate(model, glm::radians(55.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
     unsigned int model_loc = glGetUniformLocation(this->shaderProgram, "uModel");
     glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
     
+    // model light
+    glm::vec3 light_pos = glm::vec3(0.0f, 0.0f, 10.0f);
+
+    unsigned int light_pos_loc = glGetUniformLocation(this->shaderProgram, "lightPos");
+    glUniform3fv(light_pos_loc, 1, glm::value_ptr(light_pos));
+
     /*====== MATRIX PROJECTION ======*/
 
     glm::mat4 projection = glm::mat4(1.0f);
